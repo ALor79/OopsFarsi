@@ -1,7 +1,6 @@
 import time
 import threading
 import pyperclip
-
 from pynput import keyboard
 
 PERSIAN_TO_ENGLISH = {
@@ -30,7 +29,7 @@ def clear_old_keystrokes():
     while True:
         with typed_lock:
             now = time.time()
-            typed_chars[:] = [(ch, t) for ch, t in typed_chars if now - t < 10]
+            typed_chars[:] = [(ch, t) for ch, t in typed_chars if now - t < 20]
         time.sleep(1)
 
 def convert_persian_to_english(text):
@@ -40,21 +39,18 @@ def select_current_buffer():
     from pynput.keyboard import Key, Controller
     import time
 
-    keyboard_controller = Controller()
+    controller = Controller()
     with typed_lock:
         length = len(typed_chars)
-    
+    # print(f"[ACTION] Selecting {length} characters using Shift+Left")
 
-    
-    time.sleep(0.05)
-
-    keyboard_controller.press(Key.shift)
+    time.sleep(0.1)
+    controller.press(Key.shift)
     for _ in range(length):
-        keyboard_controller.press(Key.left)
-        keyboard_controller.release(Key.left)
-        time.sleep(0.005)  # small delay for stability DON'T remove
-    keyboard_controller.release(Key.shift)
-
+        controller.press(Key.right)
+        controller.release(Key.right)
+        time.sleep(0.01)
+    controller.release(Key.shift)
 
 def capture_keystrokes():
     def on_press(key):
@@ -67,13 +63,13 @@ def capture_keystrokes():
                 with typed_lock:
                     if typed_chars:
                         removed = typed_chars.pop()
-                        
+                        # print(f"[KEY] Backspace: removed {removed[0]}")
                 return
 
             if key == keyboard.KeyCode.from_char('v') and any(k in modifier_keys for k in {keyboard.Key.cmd, keyboard.Key.cmd_l, keyboard.Key.cmd_r}):
                 with typed_lock:
                     typed_chars.clear()
-                
+                # print("[KEY] Cmd+V detected. Buffer cleared.")
                 return
 
             if key == keyboard.Key.space:
@@ -88,9 +84,9 @@ def capture_keystrokes():
 
             with typed_lock:
                 typed_chars.append((char, time.time()))
-            
+            # print(f"[KEY] Recorded: {char}")
         except Exception as e:
-            
+            print(f"[ERROR] Keystroke: {e}")
 
     def on_release(key):
         modifier_keys.discard(key)
@@ -108,13 +104,13 @@ def listen_hotkey():
                 recent_text = ''.join(ch for ch, _ in typed_chars)
                 if recent_text and recent_text[-1] == 'p':
                     recent_text = recent_text[:-1]
-            
+            # print(f"[HOTKEY] Captured recent text: {recent_text}")
             if not recent_text:
-                
+                # print("[HOTKEY] No recent text to convert.")
                 return
             converted = convert_persian_to_english(recent_text)
             pyperclip.copy(converted)
-            
+            # print(f"[HOTKEY] Converted and copied: {converted}")
             threading.Thread(target=select_current_buffer, daemon=True).start()
 
     def on_release(key):
